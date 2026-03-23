@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TEYVAT: UNLIMITED SINS</title>
+    <style>
+        @font-face { font-family: 'Pixel'; src: url('https://fonts.cdnfonts.com/s/16218/DeterminationMonoWeb.woff') format('woff'); }
+        :root { --bg: #0b0e14; --accent: #D4AF37; --panel: #1a1e29; --text: #ede5ce; }
+        
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'Pixel', sans-serif; overflow: hidden; }
+
+        /* Sohbet Alanı */
+        #chat-window { height: calc(100vh - 260px); overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.6); border-bottom: 2px solid var(--accent); }
+        .msg { max-width: 85%; padding: 12px; border: 2px solid var(--accent); border-radius: 12px; font-size: 0.8rem; line-height: 1.4; animation: fadeIn 0.3s; }
+        .bot { align-self: flex-start; background: #1c2233; }
+        .user { align-self: flex-end; border-color: #666; background: #111; color: #fff; }
+
+        /* Alt Panel ve Tuşlar */
+        .panel { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 3px solid var(--accent); padding: 10px; height: 200px; z-index: 100; transition: opacity 0.4s, transform 0.4s; }
+        .panel.hidden { opacity: 0; transform: translateY(100%); pointer-events: none; }
+        
+        #stats { display: flex; justify-content: space-between; padding: 8px 15px; border-bottom: 1px solid #333; font-size: 0.7rem; color: var(--accent); }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 5px; }
+        
+        .btn { background: #2a3143; color: var(--text); border: 2px solid var(--accent); border-radius: 4px; padding: 10px 2px; cursor: pointer; font-family: 'Pixel'; font-size: 0.6rem; text-transform: uppercase; transition: 0.2s; }
+        .btn:active { background: var(--accent); color: #000; }
+
+        /* Karakter Seçici */
+        #selector, #joke-modal { position: fixed; inset: 0; background: var(--bg); z-index: 2000; padding: 20px; overflow-y: auto; text-align: center; }
+        #joke-modal { display: none; background: rgba(0,0,0,0.9); }
+        .char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-bottom: 50px; }
+        .char-card { padding: 15px; border: 2px solid #444; border-radius: 8px; background: #161b29; color: var(--text); cursor: pointer; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="selector">
+    <h1 style="color: var(--accent); font-size: 1.5rem;">TEYVAT SELECTION</h1>
+    <div class="char-grid" id="char-list"></div>
+</div>
+
+<div id="stats">
+    <div id="st-name">-</div>
+    <div id="st-meters">L:0% | LV:0% | H:0%</div>
+</div>
+
+<div id="chat-window"></div>
+
+<div class="panel" id="main-panel">
+    <div class="grid">
+        <button class="btn" onclick="openMenu('ACT')">ACT</button>
+        <button class="btn" onclick="openMenu('EXTRA')">EXTRA (18+)</button>
+        <button class="btn" style="color: #0f0;" onclick="openSize()">SİLAH GÖSTER</button>
+        <button class="btn" style="color: #ff00ff;" onclick="alert('Fotoğraf Sistemi Aktif: Arşiv taranıyor...')">FOTOĞRAF</button>
+        <button class="btn" id="marry-btn" style="color: red; display:none;" onclick="marry()">BAĞ KUR</button>
+        <button class="btn" style="grid-column: span 3; color: #888; border-color: #444;" onclick="location.reload()">GERİ DÖN</button>
+    </div>
+</div>
+
+<div id="joke-modal">
+    <h2 id="modal-title" style="color:var(--accent);"></h2>
+    <div id="modal-input" style="display:none; margin-bottom:20px;">
+        <input type="number" id="size-val" style="background:#000; color:var(--accent); border:2px solid var(--accent); padding:10px; width:60px;" placeholder="cm">
+        <button class="btn" onclick="submitSize()">GÖSTER</button>
+    </div>
+    <div id="modal-content" class="char-grid" style="grid-template-columns: 1fr;"></div>
+    <button class="btn" style="width:100%; margin-top:20px;" onclick="closeModals()">KAPAT</button>
+</div>
+
+<script>
+const CHARS = [
+    { n: "Raiden Shogun", p: "Dom", c: "#945dc4" }, { n: "Yae Miko", p: "Tease", c: "#ff85c6" },
+    { n: "Hu Tao", p: "Tease", c: "#ff4500" }, { n: "Ganyu", p: "Soft", c: "#add8e6" },
+    { n: "Ayaka", p: "Soft", c: "#e0ffff" }, { n: "Eula", p: "Dom", c: "#87ceeb" },
+    { n: "Furina", p: "Tease", c: "#4169e1" }, { n: "Arlecchino", p: "Dom", c: "#dc143c" },
+    { n: "Shenhe", p: "Dom", c: "#fff" }, { n: "Navia", p: "Soft", c: "#ffcc00" },
+    { n: "Nilou", p: "Soft", c: "#00ced1" }, { n: "Lisa", p: "Tease", c: "#9932cc" },
+    { n: "Jean", p: "Soft", c: "#f0e68c" }, { n: "Rosaria", p: "Dom", c: "#8b0000" },
+    { n: "Mona", p: "Tease", c: "#483d8b" }, { n: "Clorinde", p: "Dom", c: "#4b0082" },
+    { n: "Kokomi", p: "Soft", c: "#ffb6c1" }, { n: "Yelan", p: "Dom", c: "#191970" }
+];
+
+const DIALOGUES = {
+    Soft: {
+        "Sohbet": ["Seninle olmak çok huzurlu.", "Lütfen bana maceralarını anlat.", "Sesin beni dinlendiriyor.", "Seni dinlemeyi seviyorum.", "Yanımdan ayrılma olur mu?"],
+        "İltifat": ["Y-yanaklarım yanıyor...", "Bana böyle bakma utanıyorum.", "Teşekkür ederim nazik Gezgin.", "Kalbimi eritiyorsun.", "Senin de gözlerin çok güzel..."],
+        "Sokmalı": ["Lütfen nazik ol...", "İçim tamamen seninle dolu.", "Ah! Çok derin hissediyorum...", "Sıcaklığın beni eritiyor.", "Gezgin... canımı yakma lütfen."],
+        "Ağzına Alma": ["Umarım seni mutlu edebilirim.", "(Gok gok)... tadı beklediğimden yoğun.", "*Gözleri yaşararak alttan bakar.*", "Öhö... derine gidince nefesim kesildi.", "Hepsini alacağım... senin için."],
+        "Masaj": ["Omuzlarım çok gergindi, sağ ol.", "Ellerin sihirli gibi.", "Biraz daha aşağı... evet.", "Çok rahatladım.", "Beni şımartıyorsun."]
+    },
+    Dom: {
+        "Sohbet": ["Sadece izin verdiğimde konuş.", "Beni eğlendirebileceğini mi sandın?", "İlginç birisin, şimdilik kalabilirsin.", "Gözlerimin içine bak.", "Sözlerin eylemlerinin gölgesinde kalmasın."],
+        "İltifat": ["Bana yaranmaya mı çalışıyorsun?", "Heh, sadakatin fena değil.", "Güzel laflar seni kurtarmaz.", "Boyun eğdiğini görmek hoşuma gidiyor.", "Daha fazlasını söyle."],
+        "Sokmalı": ["Daha sert! Acıma bana!", "İşte böyle, bana itaat et!", "İçimi parçalamanı istiyorum!", "Hızını kesme, devam et!", "Bana hükmettiğini mi sanıyorsun? Heh."],
+        "Ağzına Alma": ["Diz çök ve bekle.", "(Gok gok)... tadına bakacağım.", "Hepsini boğazıma alabilirim, izle.", "Bana bakarak yapmamı seviyorsun değil mi?", "Zavallı... nasıl da titriyorsun."],
+        "Masaj": ["Hizmet et bana.", "Daha sert bas! Gücün bu kadar mı?", "Aferin, işe yarıyorsun.", "Sırtımdaki yükü sen taşıyacaksın.", "İyi yaparsan ödülünü alırsın."]
+    },
+    Tease: {
+        "Sohbet": ["Ara ara... Çok tatlısın Gezgin.", "Sana küçük bir sır vereyim mi?", "Benimle oynamak ister misin?", "Gözlerini benden alamıyorsun.", "Hadi, biraz daha eğlenelim!"],
+        "İltifat": ["Fufu... çok tatlı bir dilin var.", "Bunu herkese mi söylüyorsun?", "Egomu okşamaya devam et.", "Yanaklarım kızardı bak!", "Beni heyecanlandırıyorsun tatlım."],
+        "Sokmalı": ["Hooop! Biraz yavaş şampiyon!", "A-ah! Harika hissettiriyor!", "Zıplamaya devam et, çok eğlenceli!", "İçim yanıyor resmen!", "Durma, tam orası!"],
+        "Ağzına Alma": ["Bu lollipop biraz büyükmüş!", "(Gok gok)... beceriksiz değilim!", "Nefesimi kestin hahaha!", "Tadını sevdim, fena değil.", "Yüzün çok komik oluyor!"],
+        "Masaj": ["Oh be! Dünyalar varmış.", "Gizli yeteneklerin mi var?", "Daha aşağıya inebilirsin hehe.", "Eriyorum resmen.", "Çok iyi geldi!"]
+    }
+};
+
+let cur = null, love = 0, lust = 0, haz = 0, isSevgili = false;
+
+function loadChars() {
+    const list = document.getElementById('char-list');
+    CHARS.forEach(c => {
+        list.innerHTML += `<div class="char-card" style="border-color:${c.c}" onclick="start('${c.n}')">${c.n}</div>`;
+    });
+}
+
+function start(name) {
+    cur = CHARS.find(x => x.n === name);
+    document.getElementById('selector').style.display = 'none';
+    document.getElementById('st-name').innerText = cur.n;
+    document.documentElement.style.setProperty('--accent', cur.c);
+    addMsg(cur.n + ": Teyvat'a hoş geldin Gezgin. Ne istersin?", 'bot');
+    updateUI();
+}
+
+function hidePanel() {
+    document.getElementById('main-panel').classList.add('hidden');
+    setTimeout(() => {
+        document.getElementById('main-panel').classList.remove('hidden');
+    }, 1500);
+}
+
+function updateUI() {
+    document.getElementById('st-meters').innerText = `LUST:${lust}% | LOVE:${love}% | HAZ:${haz}%`;
+    document.getElementById('marry-btn').style.display = (love >= 50 && !isSevgili) ? 'block' : 'none';
+}
+
+function addMsg(t, type) {
+    const win = document.getElementById('chat-window');
+    const d = document.createElement('div');
+    d.className = `msg ${type}`;
+    d.innerText = t;
+    win.appendChild(d);
+    win.scrollTop = win.scrollHeight;
+}
+
+function openMenu(type) {
+    const modal = document.getElementById('joke-modal');
+    const content = document.getElementById('modal-content');
+    document.getElementById('modal-title').innerText = type;
+    document.getElementById('modal-input').style.display = 'none';
+    modal.style.display = 'block';
+    content.innerHTML = "";
+    
+    let opts = type === 'ACT' ? ["Sohbet", "İltifat", "Masaj"] : ["Öp", "Ağzına Alma", "Sokmalı", "Arkadan"];
+    if(type === 'EXTRA' && (!isSevgili || lust < 40)) {
+        content.innerHTML = "<p style='color:red;'>KİLİTLİ! Önce bağ kurmalısın.</p>";
+        return;
+    }
+    opts.forEach(o => content.innerHTML += `<button class="btn" onclick="handleAction('${o}')">${o}</button>`);
+}
+
+function handleAction(opt) {
+    closeModals();
+    hidePanel();
+    addMsg(`* (${opt} yapıldı.)`, 'user');
+    setTimeout(() => {
+        const pool = DIALOGUES[cur.p][opt] || ["Ah... çok garip."];
+        const res = pool[Math.floor(Math.random() * pool.length)];
+        love += 10; lust += 15; haz += 20;
+        addMsg(cur.n + ": " + res, 'bot');
+        updateUI();
+    }, 500);
+}
+
+function openSize() {
+    document.getElementById('joke-modal').style.display = 'block';
+    document.getElementById('modal-input').style.display = 'block';
+}
+
+function submitSize() {
+    const v = document.getElementById('size-val').value;
+    closeModals(); hidePanel();
+    addMsg(`* (${v}cm gösterdin.)`, 'user');
+    setTimeout(() => {
+        let r = v > 18 ? "Vay canına... çok büyük." : "Tatlıymış.";
+        addMsg(cur.n + ": " + r, 'bot');
+        lust += 20; updateUI();
+    }, 500);
+}
+
+function marry() { isSevgili = true; addMsg(cur.n + ": Artık sadece seninim.", 'bot'); updateUI(); }
+function closeModals() { document.getElementById('joke-modal').style.display = 'none'; }
+loadChars();
+</script>
+</body>
+</html>
