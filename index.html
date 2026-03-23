@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ROARING SINS: TEYVAT</title>
+    <style>
+        @font-face { font-family: 'Pixel'; src: url('https://fonts.cdnfonts.com/s/16218/DeterminationMonoWeb.woff') format('woff'); }
+        :root { 
+            --bg: #111520; /* Genshin gece mavisi */
+            --accent: #D4AF37; /* Genshin altın sarısı */
+            --panel: #1C2233; /* Menü arka planı */
+            --text: #ECE5CE; /* Parşömen beyazı */
+        }
+        
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'Pixel', sans-serif; overflow: hidden; }
+
+        /* Sohbet Ekranı */
+        #chat-window { height: calc(100vh - 250px); overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Genshin_Impact_logo.svg/512px-Genshin_Impact_logo.svg.png') no-repeat center; background-size: 50%; background-blend-mode: overlay; background-color: rgba(17, 21, 32, 0.9); border-bottom: 2px solid var(--accent); }
+        
+        .msg { max-width: 85%; padding: 12px; border: 2px solid var(--accent); border-radius: 10px 10px 10px 0; font-size: 0.85rem; line-height: 1.4; animation: fadeIn 0.3s; }
+        .bot { align-self: flex-start; background: rgba(28, 34, 51, 0.9); color: var(--text); }
+        .user { align-self: flex-end; border-color: #777; background: #222; border-radius: 10px 10px 0 10px; color: #fff; }
+
+        /* Alt Panel (Tuşlar) */
+        .panel { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 4px solid var(--accent); padding: 10px; height: 190px; z-index: 100; transition: opacity 0.3s; }
+        #stats { display: flex; justify-content: space-between; padding: 10px; border-bottom: 2px solid #333; font-size: 0.75rem; color: var(--accent); background: #0b0e14; }
+        
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        
+        /* Genshin Tarzı Butonlar */
+        .btn { background: #2a3143; color: var(--text); border: 2px solid var(--accent); border-radius: 6px; padding: 12px 5px; cursor: pointer; font-family: 'Pixel'; font-size: 0.65rem; text-transform: uppercase; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .btn:active { transform: translateY(2px); box-shadow: none; }
+        .btn:hover { background: var(--accent); color: #000; }
+
+        /* Modal ve Seçim */
+        #selector, #joke-modal { position: fixed; inset: 0; background: rgba(17, 21, 32, 0.98); z-index: 2000; padding: 20px; overflow-y: auto; text-align: center; }
+        #joke-modal { display: none; }
+        
+        .char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; padding-bottom: 40px; }
+        .agent-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px 5px; background: #1C2233; border-radius: 8px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div id="selector">
+    <h1 style="color: var(--accent); text-shadow: 2px 2px #000; font-size: 1.8rem; border-bottom: 2px solid var(--accent); padding-bottom: 10px;">TEYVAT: WAIFU WISH</h1>
+    <p style="font-size: 0.8rem; color: #aaa;">Dileğini yap ve yoldaşını seç...</p>
+    <div class="char-grid" id="char-list"></div>
+</div>
+
+<div id="stats">
+    <div id="st-name">KARAKTER: -</div>
+    <div id="st-rel">BAĞ: YABANCI</div>
+    <div id="st-meters">L:0% | LV:0% | H:0%</div>
+</div>
+
+<div id="chat-window"></div>
+
+<div class="panel" id="action-panel">
+    <div id="dynamic-actions" class="grid"></div>
+</div>
+
+<div id="joke-modal">
+    <h2 id="modal-title" style="color:var(--accent);">EYLEMLER</h2>
+    <div id="modal-desc" style="margin-bottom:10px; font-size:0.8rem; color: var(--text);"></div>
+    
+    <div id="modal-input-area" style="display:none; margin-bottom:15px;">
+        <input type="number" id="size-input" min="1" max="99" style="background:#1C2233; color:var(--accent); border:2px solid var(--accent); border-radius: 4px; padding:10px; font-family:'Pixel'; width:80px; text-align:center; font-size:1.2rem;" placeholder="cm">
+        <br><br>
+        <button class="btn" style="width: 100%;" onclick="submitSize()">SİLAHI GÖSTER</button>
+    </div>
+    
+    <div class="char-grid" style="grid-template-columns: 1fr;" id="modal-content"></div>
+    <button class="btn" style="margin-top:20px; width:100%; border-color: #888; color: #888; background: transparent;" onclick="closeModals()">GERİ DÖN</button>
+</div>
+
+<script>
+// GENSHIN KARAKTER VERİTABANI
+const GI_CHARS = [
+    { n: "Raiden Shogun", c: "#945dc4", p: "Dom", m: "Ebediyet için bana itaat edeceksin. ⚡" },
+    { n: "Yae Miko", c: "#ff85c6", p: "Tease", m: "Ara ara... Küçük tatlı bir oyuncak gelmiş. 🦊" },
+    { n: "Hu Tao", c: "#ff4500", p: "Tease", m: "Oya? Cenaze hizmeti mi istersin, yoksa beni mi? 👻" },
+    { n: "Ganyu", c: "#add8e6", p: "Soft", m: "Fazla mesai yapmaktan yoruldum... Biraz dinlenebilir miyim? ❄️" },
+    { n: "Ayaka", c: "#e0ffff", p: "Soft", m: "Kılıcım ve kalbim senin emrindedir, Gezgin. 🌸" },
+    { n: "Eula", c: "#87ceeb", p: "Dom", m: "Beni beklettiğin için senden intikamımı alacağım! 🧊" },
+    { n: "Furina", c: "#4169e1", p: "Tease", m: "Bana tapın! Ben Fontaine'in yıldızıyım! ✨" },
+    { n: "Arlecchino", c: "#dc143c", p: "Dom", m: "Gözlerime bak. Benden korkmuyor musun? 🔥" }
+];
+
+// 3 ANA KİŞİLİK TİPİ İÇİN DİYALOGLAR
+const DIALOGUE_BANK = {
+    Soft: { // Ganyu, Ayaka
+        "Sohbet": ["Seninle olmak Teyvat'taki en huzurlu şey.", "Lütfen bana maceralarını anlat Gezgin.", "Sesini dinlemek bütün yorgunluğumu alıyor.", "Gözlerin yıldızlar gibi parlıyor.", "Senin yanındayken zaman dursa keşke."],
+        "İltifat": ["Yaa... çok utandım! (kızarır)", "Ben... o kadar da mükemmel değilim.", "Sözlerin kalbimi eritiyor.", "Bana böyle bakma lütfen, utanıyorum.", "Teşekkür ederim Gezgin..."],
+        "Elini Tut": ["Ellerin ne kadar sıcak...", "*Parmaklarını seninkilere nazikçe kenetler.*", "Lütfen elimi hiç bırakma.", "Sadece bu bile bana güç veriyor.", "Cildin çok sert ama güven verici..."],
+        "Saçını Okşa": ["Mm... bu çok hoş.", "Gözlerim kapanıyor...", "Kendimi evcil bir hayvan gibi hissediyorum.", "Lütfen durma, çok rahatlatıcı.", "*Başını eline yaslar.*"],
+        "Masaj Yap": ["Ah... omuzlarım çok gergindi. İyi geldi.", "Ellerin sihirli gibi Gezgin.", "Bütün savaş yorgunluğum gidiyor.", "Biraz daha aşağı... evet orası.", "Beni bu kadar şımartmamalısın."],
+        "Öp": ["Dudakların çok tatlı...", "Bu benim ilk öpücüğüm...", "*Gözlerini kapatıp karşılık verir.*", "Nefesim kesildi...", "Seni çok seviyorum Gezgin."],
+        "Kucağa Al": ["Ah! Çok yükseğe çıktım!", "Kollarında çok güvende hissediyorum.", "Kalp atışlarını duyabiliyorum.", "Beni düşürme olur mu?", "Gezgin... çok güçlüsün."],
+        "Ağzına Alma": ["U-um... umarım bunu doğru yapıyorumdur.", "(Gok gok)... tadı... ilginç.", "Seni mutlu etmek istiyorum.", "*Gözleri yaşararak sana bakar.*", "Öhö... biraz derine gitti, özür dilerim."],
+        "Sokmalı": ["Lütfen... canımı çok yakma Gezgin.", "Ah! İçim çok dolu...", "Seninle bir bütün olmak harika.", "Daha yavaş... evet, böyle...", "Sıcaklığın içimi eritiyor..."],
+        "Ayakta": ["Bacaklarım titriyor, beni sıkı tut!", "Düşecekmişim gibi hissediyorum...", "Sana tamamen yaslanıyorum.", "Nefes alamıyorum, çok derin!", "Gezgin... lütfen beni bırakma."],
+        "Arkadan": ["Bu açıdan çok derine iniyorsun!", "Ah! Boynumu öpmen çok güzel...", "Lütfen sadece bana sarıl...", "Titriyorum... duramıyorum!", "İçimde her hareketini hissediyorum..."]
+    },
+    Dom: { // Raiden, Eula, Arlecchino
+        "Sohbet": ["Sadece izin verdiğimde konuş.", "Sözlerin eylemlerin kadar keskin olmalı.", "Beni eğlendir, Gezgin.", "Karşımda dimdik dur.", "İlginç birisin, hayatta kalmana izin vereceğim."],
+        "İltifat": ["Bana bildiğim şeyleri söyleme.", "Bana yaranmaya mı çalışıyorsun?", "Sadakatin takdire şayan.", "Sözlerin fena değil.", "Bana boyun eğdiğini görmek güzel."],
+        "Elini Tut": ["Sadece ben istersem tutabilirsin.", "Sıkı tut, gevşetme.", "Avuçların terliyor... heyecanlandın mı?", "Arkamda yürü.", "Fena değil."],
+        "Saçını Okşa": ["Buna cüret etmen... neyse, devam et.", "Ellerini çekersen sonun kötü olur.", "Bunu sadece sana yaptırıyorum.", "Tırnaklarınla hafifçe kazı.", "Değerini bil."],
+        "Masaj Yap": ["İşte böyle, hizmet et.", "Daha sert bas!", "Aferin, işe yarıyorsun.", "İyi yaparsan ödüllendirilirsin.", "Tüm yükümü alacaksın."],
+        "Öp": ["İzin verdiğimde öpeceksin.", "Isırmamam için dua et.", "*Seni sertçe öper.*", "Nefesin kesilene kadar bırakmam.", "Bana tamamen itaat et!"],
+        "Kucağa Al": ["Beni taşıyabileceğine emin misin?", "Beni düşürürsen bacaklarını kırarım.", "İyi iş. Şimdi yatağa yürü.", "Bana hükmettiğini sanma.", "Fena hissettirmiyor."],
+        "Ağzına Alma": ["Diz çök ve minnettar ol.", "Tadına bakacağım.", "(Gok gok)... bunu seviyorsun değil mi?", "Boğulacağımı sanma.", "Bana bakarak izle."],
+        "Sokmalı": ["Daha sert! Acıma!", "Heh, beklediğimden iyisin.", "Bana tamamen itaat et.", "İçimdeki ateşle yan!", "Durmana izin vermedim, devam et!"],
+        "Ayakta": ["Beni duvara yasla ve gücünü göster!", "Bacaklarımı beline doladım, beni hayal kırıklığına uğratma.", "Havada olmak hoşuma gidiyor... durma!", "Ağırlığımı kaldır!", "Daha derine, tamamen delip geç!"],
+        "Arkadan": ["Evet, bu pozisyon sana uygun. Arkamda kal.", "Kalçalarımı sıkıca tut!", "Benim kontrolümdesin, unutma.", "Darbelerin ses getirsin!", "İnlememek için kendimi zor tutuyorum."]
+    },
+    Tease: { // Yae Miko, Hu Tao, Furina
+        "Sohbet": ["Ara ara... Çok tatlısın Gezgin.", "Sana küçük bir sır vereyim mi?", "Benimle oynamak ister misin?", "Gözlerini benden alamıyorsun, değil mi?", "Daha eğlenceli şeylerden bahsedelim!"],
+        "İltifat": ["Fufu... çok tatlı bir dilin var.", "Bunu herkese mi söylüyorsun yoksa?", "Egomu okşamaya devam et tatlım.", "Şımartıyorsun beni!", "Hehehe, yanaklarım kızardı sanırım."],
+        "Elini Tut": ["Ooo, romantik serseri!", "*Seni kendine doğru hızla çeker.*", "Beni nereye kaçırıyorsun?", "Ellerin çok büyükmüş!", "Yakalandın! Artık kaçamazsın."],
+        "Saçını Okşa": ["Hey, saçımı bozacaksın! ...Ama fena değilmiş.", "Biraz daha aşağıya iner misin? Hehe.", "Beni mayıştırıyorsun, uyursam suçlusu sensin.", "Kedicik miyim ben? Miyav!", "Hoşuma gitti, durma sakın."],
+        "Masaj Yap": ["Oh be! Dünyavarmış.", "Gizli bir yeteneğin mi var?", "Biraz da sırtıma doğru inebilir miyiz?", "Eriyorum şu an... cıvık bir pelteden ibaretim.", "Çok iyi! Spordan sonra bu şarttı."],
+        "Öp": ["Tuttum seni! Muaah!", "Ooo, çok hızlısın!", "Nefes alamadım bir an hahaha!", "Dudakların tam dişlemelik.", "Bir daha! Bir daha!"],
+        "Kucağa Al": ["Yuppi! Uçuyorum!", "Beni yatağa fırlatmanı bekliyorum kaptan!", "Atın beni denizlere! Hahaha!", "Oha baya güçlüymüşsün.", "Beni ne kadar uzağa fırlatabilirsin? Şaka!"],
+        "Ağzına Alma": ["Eee, bu lollipop biraz büyükmüş!", "(Gok gok)... beceriksiz olduğumu sanma!", "Nefesim kesilecek hahaha!", "Tadını sevdim, fena değilmiş.", "Bana bakarken yüzün çok komik!"],
+        "Sokmalı": ["Hooop! Biraz yavaş ol şampiyon!", "A-ah... beklediğimden çok daha iyi!", "Zıplamaya devam et! Çok eğlenceli!", "Hız sınırını aşıyoruz tatlım, durma!", "Çok sıcak! İçim yanıyor!"],
+        "Ayakta": ["Beni düşürme sakın ha!", "Vay canına, lunapark aleti gibi hahaha!", "Duvarda iz bırakacağız benden söylemesi.", "Zıplamama izin ver!", "Çok enerjik! Bayıldım buna!"],
+        "Arkadan": ["Ooo, manzarayı sevdin mi arkadan?", "Popoma şaplak atmanı bekliyorum! Hahaha!", "Sert ol! Dayanabilirim!", "Tam isabet! Aynen böyle devam!", "Sesim çok mu çıkıyor? Boşver!"]
+    }
+};
+
+let cur = null, love = 0, lust = 0, haz = 0, isSevgili = false;
+
+function loadCharacters() {
+    const list = document.getElementById('char-list');
+    GI_CHARS.forEach(char => {
+        let pLabel = char.p === "Dom" ? "⚔️ BÜYÜK" : char.p === "Soft" ? "🌸 NAZİK" : "🦊 OYUNCU";
+        list.innerHTML += `<button class="btn agent-btn" style="border-color:${char.c}; color:${char.c}" onclick="start('${char.n}')">
+            <span style="font-size: 1.1rem; margin-bottom: 5px; color: var(--text);">${char.n}</span>
+            <small style="color:${char.c};">${pLabel}</small>
+        </button>`;
+    });
+}
+
+function start(name) {
+    cur = GI_CHARS.find(x => x.n === name);
+    document.getElementById('selector').style.display = 'none';
+    document.documentElement.style.setProperty('--accent', cur.c);
+    document.getElementById('st-name').innerText = "YOLDAŞ: " + cur.n;
+    love = 0; lust = 0; haz = 0; isSevgili = false;
+    document.getElementById('chat-window').innerHTML = "";
+    
+    // Konuşma başlayınca tuşları saklama mantığı:
+    document.getElementById('action-panel').style.opacity = '0';
+    document.getElementById('action-panel').style.pointerEvents = 'none';
+    
+    setTimeout(() => {
+        addMsg(cur.n + ": " + cur.m, 'bot');
+        document.getElementById('action-panel').style.opacity = '1';
+        document.getElementById('action-panel').style.pointerEvents = 'auto';
+        renderMainPanel();
+        updateUI();
+    }, 1500);
+}
+
+function renderMainPanel() {
+    const panel = document.getElementById('dynamic-actions');
+    panel.innerHTML = `
+        <button class="btn" onclick="openMenu('ACT')">ACT (NORMAL)</button>
+        <button class="btn" onclick="openMenu('EXTRA')">EXTRA (18+)</button>
+        <button class="btn" style="border-color:#0f0; color:#0f0;" onclick="openShowMenu()">SİLAH GÖSTER</button>
+        <button id="marry-btn" class="btn" style="color:#ff4655; border-color:#ff4655;" onclick="marry()">BAĞ KUR (SEVGİLİ)</button>
+        <button class="btn" style="border-color: #888; color:#888; grid-column: span 2;" onclick="location.reload()">DİLEK EKRANINA DÖN</button>
+    `;
+}
+
+function updateUI() {
+    document.getElementById('st-meters').innerText = `LUST:${lust}% | LOVE:${love}% | HAZ:${haz}%`;
+    document.getElementById('st-rel').innerText = "BAĞ: " + (isSevgili ? "SÖZLEŞMELİ ❤️" : "YABANCI");
+    const mBtn = document.getElementById('marry-btn');
+    if(mBtn) mBtn.style.display = (love>=40 && !isSevgili) ? 'block' : 'none';
+}
+
+function addMsg(t, type) {
+    const win = document.getElementById('chat-window');
+    const d = document.createElement('div');
+    d.className = `msg ${type}`;
+    d.innerText = t;
+    win.appendChild(d);
+    win.scrollTop = win.scrollHeight;
+}
+
+function openShowMenu() {
+    const modal = document.getElementById('joke-modal');
+    document.getElementById('modal-title').innerText = "SİLAH BOYUTU";
+    document.getElementById('modal-desc').innerText = "Kılıcının boyutunu gir (cm):";
+    document.getElementById('modal-input-area').style.display = 'block';
+    document.getElementById('modal-content').innerHTML = "";
+    modal.style.display = 'block';
+}
+
+function submitSize() {
+    const val = parseInt(document.getElementById('size-input').value);
+    if(isNaN(val)) return;
+    closeModals();
+    addMsg(`* (${val}cm olduğunu gösterdin.)`, 'user');
+    
+    // Tuşları gizle
+    document.getElementById('action-panel').style.opacity = '0';
+    document.getElementById('action-panel').style.pointerEvents = 'none';
+    
+    setTimeout(() => {
+        let resp = "";
+        if(val <= 12) {
+            resp = cur.p === "Soft" ? "Önemli olan onu nasıl kullandığındır Gezgin... 😳" : cur.p === "Dom" ? "Heh. Bu Dull Blade ile mi savaşacaksın? 🤣" : "Ayy çok tatlı! Kısa bir hançer gibi! 😂";
+        } else if(val <= 18) {
+            resp = cur.p === "Soft" ? "Güven verici bir boyutu var. ❤️" : cur.p === "Dom" ? "İyi bir 4 yıldızlı kılıç sayılır. İş görür." : "Harika! Tam kıvamında! 😏";
+        } else {
+            resp = cur.p === "Soft" ? "Aman Tanrım! 5 yıldızlı bir Claymore mu bu?! ✨" : cur.p === "Dom" ? "Vay canına... Efsanevi bir silah. Etkilendim. 😈" : "Oha oha! Dev gibi! Sakla onu çabuk! 🥵";
+            lust += 30;
+        }
+        addMsg(cur.n + ": " + resp, 'bot');
+        updateUI();
+        
+        // Tuşları geri getir
+        document.getElementById('action-panel').style.opacity = '1';
+        document.getElementById('action-panel').style.pointerEvents = 'auto';
+    }, 1500);
+}
+
+function openMenu(type) {
+    const modal = document.getElementById('joke-modal');
+    const content = document.getElementById('modal-content');
+    document.getElementById('modal-title').innerText = type + " SEÇENEKLERİ";
+    document.getElementById('modal-input-area').style.display = 'none';
+    modal.style.display = 'block';
+    content.innerHTML = "";
+    
+    let opts = [];
+    if(type === 'ACT') {
+        opts = ["Sohbet", "İltifat", "Elini Tut", "Saçını Okşa", "Masaj Yap"];
+    } else if (type === 'EXTRA') {
+        if(!isSevgili || lust < 40) {
+            content.innerHTML = "<p style='color:#ff4655;'>KİLİTLİ! (Sevgili ol & %40 Lust gerekli)</p>";
+            return;
+        }
+        opts = ["Öp", "Kucağa Al", "Ağzına Alma", "Sokmalı", "Ayakta", "Arkadan"];
+    }
+    
+    opts.forEach(o => content.innerHTML += `<button class="btn" style="border-color:var(--accent); color:var(--text);" onclick="handleAction('${o}')">${o}</button>`);
+}
+
+function handleAction(opt) {
+    closeModals();
+    addMsg(`* (${opt} eylemini uyguladın.)`, 'user');
+    
+    // Tuşları gizle (Senin özel kuralın)
+    document.getElementById('action-panel').style.opacity = '0';
+    document.getElementById('action-panel').style.pointerEvents = 'none';
+    
+    setTimeout(() => {
+        const pool = DIALOGUE_BANK[cur.p][opt];
+        const randomResp = pool ? pool[Math.floor(Math.random() * pool.length)] : "İlginç...";
+        
+        lust += 12; love += 6;
+        if(opt === "Sokmalı" || opt === "Ayakta" || opt === "Arkadan") haz += 25;
+        
+        addMsg(cur.n + ": " + randomResp, 'bot');
+        updateUI();
+        
+        // Tuşları geri getir
+        document.getElementById('action-panel').style.opacity = '1';
+        document.getElementById('action-panel').style.pointerEvents = 'auto';
+    }, 1500);
+}
+
+function marry() { isSevgili = true; love = 100; addMsg(cur.n + ": Artık ruhlarımız birbirine bağlandı... ❤️", 'bot'); updateUI(); }
+function closeModals() { document.getElementById('joke-modal').style.display = 'none'; }
+
+loadCharacters();
+</script>
+</body>
+</html>
